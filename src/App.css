@@ -1277,3 +1277,11 @@ footer p {
     align-items: flex-start;
   }
 }
+
+/* NOTIFICATION SETTINGS */
+.notification-settings { display:flex; align-items:center; justify-content:space-between; gap:16px; margin:16px 0; padding:17px 19px; background:#eef8f0; border:1px solid #d8ecdd; border-radius:12px; }
+.notification-settings strong { display:block; color:#183d2c; font-size:12px; }
+.notification-settings p { margin-top:5px; color:#718579; font-size:11px; }
+.notification-settings button { display:inline-flex; align-items:center; justify-content:center; gap:8px; flex-shrink:0; border:0; border-radius:8px; padding:11px 15px; background:#087b45; color:white; font-size:11px; font-weight:700; }
+.notification-settings button:disabled { background:#dcefe1; color:#137449; cursor:default; }
+@media (max-width:520px) { .notification-settings { align-items:flex-start; flex-direction:column; } .notification-settings button { width:100%; } }

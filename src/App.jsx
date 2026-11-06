@@ -20,7 +20,6 @@ import {
 } from "./climate";
 import { districtCenters } from "./mapGeo";
 import RwandaMap from "./RwandaMap";
-
 import "./App.css";
 
 // RWANDA: 5 PROVINCES AND 30 DISTRICTS
@@ -85,7 +84,8 @@ const translations = {
     source: "Amakuru anyayo: Open-Meteo",
     live: "Amakuru anyayo",
     updated: "Byavuguruwe",
-    noAlerts: "Nta miburo ikomeye ihari ubu."
+    noAlerts: "Nta miburo ikomeye ihari ubu.",
+    enableNotifications: "Fungura imenyesha", notificationsEnabled: "Imenyesha ryafunguwe", notificationsDenied: "Ntiwemeye imenyesha", notificationHelp: "Emera imenyesha kugira ngo ubone imiburo mishya y’ikirere."
   },
 
   en: {
@@ -124,7 +124,8 @@ const translations = {
     source: "Live data: Open-Meteo",
     live: "Live data",
     updated: "Updated",
-    noAlerts: "No severe alerts right now."
+    noAlerts: "No severe alerts right now.",
+    enableNotifications: "Enable notifications", notificationsEnabled: "Notifications enabled", notificationsDenied: "Notifications blocked", notificationHelp: "Allow notifications to receive new climate alerts."
   },
 
   fr: {
@@ -163,7 +164,8 @@ const translations = {
     source: "Données réelles : Open-Meteo",
     live: "Données réelles",
     updated: "Mis à jour",
-    noAlerts: "Aucune alerte sévère pour le moment."
+    noAlerts: "Aucune alerte sévère pour le moment.",
+    enableNotifications: "Activer les notifications", notificationsEnabled: "Notifications activées", notificationsDenied: "Notifications bloquées", notificationHelp: "Autorisez les notifications pour recevoir les nouvelles alertes climatiques."
   }
 };
 
@@ -223,13 +225,13 @@ const pageText = {
     agriculture: {
       intro: "Amakuru y'ubuhinzi ajyanye n'ibihe by'ikirere mu Rwanda.",
       seasons: "Ibihe by'ubuhinzi",
-      seasonA: "Igihe A",
+      seasonA: "Igihembwe A",
       seasonAMonths: "Nzeli – Mutarama",
       seasonADesc: "Imvura nkeya. Igihe cyiza cyo guhinga ibishyimbo, ibigori n'imboga.",
-      seasonB: "Igihe B",
+      seasonB: "Igihembwe B",
       seasonBMonths: "Gashyantare – Gicurasi",
       seasonBDesc: "Imvura nyinshi. Ni igihe gikuru cy'ubuhinzi bw'ibihingwa byinshi.",
-      seasonC: "Igihe C",
+      seasonC: "Igihembwe C",
       seasonCMonths: "Kamena – Kanama",
       seasonCDesc: "Igihe cy'izuba. Koresha uburyo bwo kuhira n'ibihingwa byo mu bishanga.",
       crops: "Ibihingwa by'ingenzi",
@@ -554,7 +556,7 @@ function formatUpdated(value, language) {
 function Logo() {
   return (
     <div className="logo">
-      <img src="/icon.svg" alt="Ikirere Cyacu" />
+      <img src="/logo.png" alt="Ikirere Cyacu" />
 
       <div>
         <strong>Ikirere Cyacu</strong>
@@ -1264,7 +1266,7 @@ function AgriculturePage(props) {
 
 // ALERTS PAGE
 function AlertsPage(props) {
-  const { t, txt, weather, status, district, language, lastUpdated } = props;
+  const { t, txt, weather, status, district, language, lastUpdated, notificationState, onEnableNotifications } = props;
   const p = txt.alerts;
   const alerts = buildAlerts(weather?.daily).map((alert) => {
     const title = alert.kind === "rain"
@@ -1296,6 +1298,11 @@ function AlertsPage(props) {
       <PageHeader title={t.alerts} text={p.intro} />
 
       <p className="sample"><span>ⓘ</span>{sourceNote}</p>
+
+      <section className="notification-settings">
+        <div><strong>{t.notificationHelp}</strong><p>{notificationState === "granted" ? t.notificationsEnabled : notificationState === "denied" ? t.notificationsDenied : t.enableNotifications}</p></div>
+        <button type="button" onClick={onEnableNotifications} disabled={notificationState === "granted"}><Bell size={17} /> {notificationState === "granted" ? t.notificationsEnabled : t.enableNotifications}</button>
+      </section>
 
       {alerts.length === 0 ? (
         <p className="data-state">
@@ -1506,6 +1513,7 @@ export default function App() {
   const [errorDistrict, setErrorDistrict] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [notificationState, setNotificationState] = useState(() => typeof window !== "undefined" && "Notification" in window ? Notification.permission : "unsupported");
 
   const t = translations[language];
   const txt = pageText[language];
@@ -1562,6 +1570,25 @@ export default function App() {
       controller.abort();
     };
   }, [district, refreshKey]);
+
+  async function enableNotifications() {
+    if (!("Notification" in window)) { setNotificationState("unsupported"); return; }
+    const permission = await Notification.requestPermission();
+    setNotificationState(permission);
+    if (permission === "granted") new Notification("Ikirere Cyacu", { body: language === "rw" ? "Imenyesha ry'imiburo y'ikirere ryafunguwe." : language === "fr" ? "Les notifications d'alertes climatiques sont activées." : "Climate alert notifications are enabled." });
+  }
+
+  useEffect(() => {
+    if (!("Notification" in window) || Notification.permission !== "granted" || !weather?.daily) return;
+    buildAlerts(weather.daily).forEach((alert) => {
+      const key = `ikirere-alert-${district}-${alert.kind}-${alert.value}`;
+      if (window.localStorage.getItem(key)) return;
+      const title = alert.kind === "rain" ? (language === "rw" ? "Imvura nyinshi iteganyijwe" : language === "fr" ? "Fortes pluies prévues" : "Heavy rain expected") : alert.kind === "wind" ? (language === "rw" ? "Umuyaga ukaze uteganyijwe" : language === "fr" ? "Vents forts prévus" : "Strong winds expected") : (language === "rw" ? "Ubushyuhe bwinshi buteganyijwe" : language === "fr" ? "Fortes températures prévues" : "High temperatures expected");
+      const unit = alert.kind === "rain" ? " mm" : alert.kind === "wind" ? " km/h" : "°C";
+      new Notification(`Ikirere Cyacu — ${title}`, { body: `${district}: ${alert.value}${unit}`, tag: key });
+      window.localStorage.setItem(key, "sent");
+    });
+  }, [weather, district, language, notificationState]);
 
   const status = dataDistrict === district
     ? "ready"
@@ -1756,7 +1783,9 @@ export default function App() {
 
             <button
               className="notification"
-              aria-label="Notifications"
+              aria-label={t.enableNotifications}
+              title={t.enableNotifications}
+              onClick={enableNotifications}
             >
               <Bell size={19} />
             </button>
@@ -2110,6 +2139,8 @@ export default function App() {
               lastUpdated={lastUpdated}
               language={language}
               onRetry={() => setRefreshKey((key) => key + 1)}
+              notificationState={notificationState}
+              onEnableNotifications={enableNotifications}
             />
 
           ) : null}
